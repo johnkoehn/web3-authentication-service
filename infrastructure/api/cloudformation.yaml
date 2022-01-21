@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Infrastructure Code for the Web3 Authentication Service
+Parameters:
+  ServiceName:
+    Type: String
+    Description: The name of the service we are deploying
+  DeveloperAccount:
+    Type: String
+    Description: The developer account
+Resources:
+  KMS:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: adn-management-kms-service
+      Enabled: true
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Sub ${ServiceName}-kms-policy
+        Statement:
+          - Sid: developer-access
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}"
+            Action: "kms:*"
+            Resource: "*"
+  JwksSecretsManager:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub ${ServiceName} JWKS Secrets Manager
+      KmsKeyId: !Ref KMS
+      Name: !Sub ${ServiceName}-jwks-secrets-manager
