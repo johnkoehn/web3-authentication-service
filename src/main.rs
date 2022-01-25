@@ -2,7 +2,7 @@
 extern crate serde_derive;
 use serde::{Serialize, Deserialize};
 use dotenv;
-use tokens::create_token;
+use tokens::{create_token, validate_token};
 use std::env;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .service(health)
             .service(create_token)
+            .service(validate_token)
     })
     .bind("127.0.0.1:8000")?
     .run()
