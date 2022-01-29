@@ -1,8 +1,13 @@
+extern crate ed25519_dalek;
 use serde::{Serialize, Deserialize};
 use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
-use actix_web::{post, web, HttpResponse, Responder, HttpRequest};
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
-use web3::signing::{recover};
+use actix_web::{post, web::{self, Buf}, HttpResponse, Responder, HttpRequest};
+use std::{time::{SystemTime, Duration, UNIX_EPOCH}, os::unix::prelude::OsStringExt};
+use bs58;
+use ed25519_dalek::{PublicKey, Verifier};
+use rand::rngs::OsRng;
+use ed25519_dalek::Keypair;
+use ed25519_dalek::Signature;
 
 pub mod unauthorized;
 
@@ -60,7 +65,11 @@ pub async fn validate_token(request: HttpRequest) ->  impl Responder {
     }
 
     let base_token = base_token_header.unwrap().to_str().unwrap();
-
+    println!("{}", base_token);
+    // let base_token_encoded = bs58::encode(base_token.as_bytes());
+    // let base_token_decoded = bs58::decode(base_token.as_bytes()).into_vec().unwrap();
+    // let base_token_decoded = base_token_decoded.as_slice();
+    // println!("{}", base_token_encoded);
     // TODO verify and decode the JWT
 
     // in the mean time we will get public key from header
@@ -69,17 +78,35 @@ pub async fn validate_token(request: HttpRequest) ->  impl Responder {
         return unauthorized::error(unauthorized::ErrorTypes::InvalidSignedToken)
     }
 
-    let pubkey = recover(base_token.as_bytes(), &signed_token.as_bytes()[..64], 0);
-    if pubkey.is_err() {
-        println!("Error with pubkey {}", pubkey.err().unwrap());
-        return unauthorized::error(unauthorized::ErrorTypes::InvalidSignature)
-    }
+    // let pubkey = recover(base_token.as_bytes(), &signed_token.as_bytes(), 0);
+    // if pubkey.is_err() {
+    //     println!("Error with pubkey {}", pubkey.err().unwrap());
+    //     return unauthorized::error(unauthorized::ErrorTypes::InvalidSignature)
+    // }
 
-    let pubkey = pubkey.unwrap().to_string();
-    println!("{}", pubkey);
-    if pubkey != public_key_header.unwrap().to_str().unwrap() {
-        return unauthorized::error(unauthorized::ErrorTypes::InvalidSignature)
-    }
+    // println!("{}", pubkey);
+    // if pubkey != public_key_header.unwrap().to_str().unwrap() {
+    //     return unauthorized::error(unauthorized::ErrorTypes::InvalidSignature)
+    // }
+
+    let pub_key = public_key_header.unwrap().to_str().unwrap().as_bytes();
+    // println!("{}", pub_key);
+    let pub_key = bs58::decode(pub_key).into_vec().unwrap();
+    let pub_key = pub_key.as_slice();
+
+    let test = bs58::decode(signed_token).into_vec().unwrap();
+    let test = test.as_slice();
+
+    // let pub_key = signature::UnparsedPublicKey::new(&signature::ED25519, pub_key);
+    // let error = pub_key.verify(base_token_encoded.as_bytes(), test).unwrap_err();
+    println!("{}", test.len());
+
+    let public_key: PublicKey = PublicKey::from_bytes(pub_key).unwrap();
+    let signature: Signature = Signature::from_bytes(&test[..]).unwrap();
+    println!("{}", public_key.verify(base_token.as_bytes(), &signature).unwrap_err());
+
+
+    // verify(pub_key,  base_token.to_string(), &test);
     HttpResponse::Ok().finish()
 }
 

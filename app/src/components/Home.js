@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { web3 } from '@project-serum/anchor';
 import fetch from 'node-fetch';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
 import LoadingButton from './util/LoadingButton';
 import Loading from './util/Loading';
 import Error from './util/Error';
-
-const textDecoder = new TextDecoder();
 
 const Home = () => {
     const [error, setError] = useState(undefined);
@@ -39,11 +38,13 @@ const Home = () => {
         const body = await response.json();
         const accessToken = body.access_token;
         const signedMessage = await wallet.signMessage(Uint8Array.from(accessToken));
+        console.log(signedMessage.length);
         const signedtoken = bs58.encode(signedMessage);
         setToken(signedtoken);
         setJwt(accessToken);
 
-        console.log(wallet.publicKey.toString());
+        console.log(wallet.publicKey.toBase58());
+        console.log(wallet.publicKey.toBuffer().length);
 
         const result = nacl.sign.detached.verify(Uint8Array.from(accessToken), signedMessage, wallet.publicKey.toBytes());
         console.log(result);
