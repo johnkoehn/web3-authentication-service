@@ -24,9 +24,50 @@ Resources:
               AWS: !Sub "arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}"
             Action: "kms:*"
             Resource: "*"
+          - Sid: Role Access
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt TaskRole.Arn
+            Action:
+              - kms:GenerateDataKey
+              - kms:Decrypt
+            Resource: "*"
   JwksSecretsManager:
     Type: AWS::SecretsManager::Secret
     Properties:
       Description: !Sub ${ServiceName} JWKS Secrets Manager
       KmsKeyId: !Ref KMS
       Name: !Sub ${ServiceName}-jwks-secrets-manager
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: The role for the fargate task to assume
+      RoleName: !Sub ${ServiceName}-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}
+            Action:
+              - 'sts:AssumeRole'
+  TaskPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: !Sub "${ServiceName}-task-policy"
+      Roles:
+        - !Ref TaskRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "secretsmanager:GetRandomPassword"
+              - "secretsmanager:GetResourcePolicy"
+              - "secretsmanager:GetSecretValue"
+              - "secretsmanager:DescribeSecret"
+              - "secretsmanager:ListSecretVersionIds"
+            Resource: !Ref JwksSecretsManager
