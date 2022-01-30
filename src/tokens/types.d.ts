@@ -1,0 +1,3 @@
+interface TokenRequest {
+    publicKey: string
+}

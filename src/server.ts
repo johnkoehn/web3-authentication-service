@@ -5,6 +5,7 @@ import { setTimeout } from 'timers/promises';
 import health from './health';
 import catchAll from './catchAll';
 import assumeTaskRole from './util/aws/assumeTaskRole';
+import createToken from './tokens/createToken';
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ const init = async () => {
     // server.auth.scheme('ciamScheme', ciamScheme);
     // server.auth.strategy('CIAM', 'ciamScheme');
 
+    server.route(createToken);
     server.route(health);
     server.route(catchAll);
 
