@@ -6,6 +6,8 @@ import health from './health';
 import catchAll from './catchAll';
 import assumeTaskRole from './util/aws/assumeTaskRole';
 import createToken from './tokens/createToken';
+import getJwks from './tokens/getJwks';
+import getKeys from './util/keys/getKeys';
 
 dotenv.config();
 
@@ -15,6 +17,10 @@ const handleError = (request: Request, h: ResponseToolkit, err: any) => {
 
 const init = async () => {
     await assumeTaskRole();
+
+    if (process.env.ENVIRONMENT !== 'local') {
+        await getKeys(false, true);
+    }
 
     const server = Hapi.server({
         port: 8000,
@@ -32,15 +38,8 @@ const init = async () => {
 
     server.validator(joi);
 
-    // const ciamScheme = () => {
-    //     return {
-    //         authenticate: authorizeCiam
-    //     };
-    // };
-    // server.auth.scheme('ciamScheme', ciamScheme);
-    // server.auth.strategy('CIAM', 'ciamScheme');
-
     server.route(createToken);
+    server.route(getJwks);
     server.route(health);
     server.route(catchAll);
 

@@ -1,14 +1,12 @@
 import { Request, ResponseToolkit, ResponseObject } from '@hapi/hapi';
 import tokenRequestSchema from './tokenRequestSchema';
-import readSecrets from '../util/aws/readSecrets';
+import createJwt from './createJwt';
 
 const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseObject> => {
-    const result = await readSecrets();
-    console.log(result);
+    const tokenRequest = request.payload as TokenRequest;
+    const result = await createJwt(tokenRequest.publicKey);
 
-    return h.response({
-        status: 'healthy'
-    }).code(200);
+    return h.response(result).code(200);
 };
 
 export default {

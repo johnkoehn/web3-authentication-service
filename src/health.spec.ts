@@ -12,7 +12,7 @@ describe('Health', () => {
 
         request = {
             method: 'GET',
-            url: '/v1/health'
+            url: '/health'
         };
     });
 

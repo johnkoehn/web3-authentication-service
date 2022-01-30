@@ -39,7 +39,7 @@ describe('Catch All', () => {
 
         delete request.payload;
         request.method = 'GET';
-        request.url = '/v1/health';
+        request.url = '/health';
 
         const response = await server.inject(request);
 
