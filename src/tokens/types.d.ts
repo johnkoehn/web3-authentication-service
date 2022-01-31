@@ -7,3 +7,7 @@ interface TokenResponse {
     token_type: string
     expires_in: number
 }
+
+interface JwtVerifyPromise {
+    (jwt: string, getKey: function, verifyOptions: VerifyOptions): Promise<JwtPayload>
+}

@@ -8,6 +8,7 @@ import assumeTaskRole from './util/aws/assumeTaskRole';
 import createToken from './tokens/createToken';
 import getJwks from './tokens/getJwks';
 import getKeys from './util/keys/getKeys';
+import validate from './tokens/validate/validate';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ const init = async () => {
 
     server.route(createToken);
     server.route(getJwks);
+    server.route(validate);
     server.route(health);
     server.route(catchAll);
 

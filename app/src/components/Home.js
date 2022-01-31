@@ -9,6 +9,8 @@ import LoadingButton from './util/LoadingButton';
 import Loading from './util/Loading';
 import Error from './util/Error';
 
+const encoder = new TextEncoder();
+
 const Home = () => {
     const [error, setError] = useState(undefined);
     const [token, setToken] = useState(undefined);
@@ -37,16 +39,17 @@ const Home = () => {
         // get the access token and have the user sign it
         const body = await response.json();
         const accessToken = body.access_token;
-        const signedMessage = await wallet.signMessage(Uint8Array.from(accessToken));
+        const signedMessage = await wallet.signMessage(encoder.encode(accessToken));
         console.log(signedMessage.length);
         const signedtoken = bs58.encode(signedMessage);
         setToken(signedtoken);
         setJwt(accessToken);
 
         console.log(wallet.publicKey.toBase58());
+        console.log(wallet.publicKey.toString());
         console.log(wallet.publicKey.toBuffer().length);
 
-        const result = nacl.sign.detached.verify(Uint8Array.from(accessToken), signedMessage, wallet.publicKey.toBytes());
+        const result = nacl.sign.detached.verify(encoder.encode(accessToken), signedMessage, wallet.publicKey.toBytes());
         console.log(result);
     };
 
