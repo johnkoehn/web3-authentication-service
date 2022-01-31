@@ -41,3 +41,9 @@ export const producePublicKeySet = (): PublicJwks => {
         keys: [producePublicKey(), producePublicKey()]
     };
 };
+
+export const createRandomObject = (): any => {
+    return {
+        [chance.string()]: chance.word()
+    };
+};

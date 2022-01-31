@@ -2,7 +2,9 @@ import jose from 'node-jose';
 import { DateTime } from 'luxon';
 import getKeys from '../util/keys/getKeys';
 
-const createJwt = async (publicKey: string) => {
+const TWELEVE_HOURS = 43200;
+
+const createJwt = async (publicKey: string): Promise<TokenResponse> => {
     const keys: Jwks | PublicJwks = await getKeys(false, false);
 
     const keyStore: jose.JWK.KeyStore = await jose.JWK.asKeyStore(keys);
@@ -17,12 +19,13 @@ const createJwt = async (publicKey: string) => {
         }
     };
 
-    const now = DateTime.now();
+    // luxon returing to seconds with seconds being decimals??? https://github.com/moment/luxon/issues/565
+    const now = DateTime.now().toUTC();
     const body = {
         sub: publicKey,
-        exp: now.plus({ hours: 12 }).toSeconds(),
-        iat: now.toSeconds(),
-        iss: 'https://exonerated.io/'
+        exp: ((now.toSeconds() * 1000) + TWELEVE_HOURS),
+        iat: (now.toSeconds() * 1000),
+        iss: process.env.ISSUER
     };
     const payload = JSON.stringify(body);
     const token = await jose.JWS.createSign(options, key)
@@ -30,9 +33,9 @@ const createJwt = async (publicKey: string) => {
         .final();
 
     return {
-        access_token: token,
+        access_token: (token as unknown as string),
         token_type: 'Bearer',
-        expires_in: 43200 // 12 hours
+        expires_in: TWELEVE_HOURS
     };
 };
 
