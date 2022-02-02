@@ -2,7 +2,7 @@ import { Request, ResponseObject, ResponseToolkit } from '@hapi/hapi';
 import jose from 'node-jose';
 import Boom from '@hapi/boom';
 import nacl from 'tweetnacl';
-import { verify, JwtHeader } from 'jsonwebtoken';
+import { verify, JwtHeader, JwtPayload } from 'jsonwebtoken';
 import { TextEncoder, promisify } from 'util';
 import bs58 from 'bs58';
 import getKeys from '../../util/keys/getKeys';
@@ -50,10 +50,14 @@ const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseOb
 
     // validate the JWT
     try {
-        await jwtVerifyPromise(baseToken, getSigningKey, {
+        const jwtPayload: JwtPayload = await jwtVerifyPromise(baseToken, getSigningKey, {
             algorithms: ['RS256'],
             issuer: process.env.ISSUER
         });
+
+        if (jwtPayload.sub !== publicKey) {
+            throw new Error('Subject does not matched the public key');
+        }
     } catch (err: any) {
         throw Boom.badRequest(err.message);
     }
