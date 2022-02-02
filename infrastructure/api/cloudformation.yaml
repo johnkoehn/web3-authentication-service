@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Infrastructure Code for the Web3 Authentication Service
+Parameters:
+  ServiceName:
+    Type: String
+    Description: The name of the service we are deploying
+  DeveloperAccount:
+    Type: String
+    Description: The developer account
+Resources:
+  KMS:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: adn-management-kms-service
+      Enabled: true
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Sub ${ServiceName}-kms-policy
+        Statement:
+          - Sid: developer-access
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}"
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: Role Access
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt TaskRole.Arn
+            Action:
+              - kms:GenerateDataKey
+              - kms:Decrypt
+            Resource: "*"
+  JwksSecretsManager:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub ${ServiceName} JWKS Secrets Manager
+      KmsKeyId: !Ref KMS
+      Name: !Sub ${ServiceName}-jwks-secrets-manager
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: The role for the fargate task to assume
+      RoleName: !Sub ${ServiceName}-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}
+            Action:
+              - 'sts:AssumeRole'
+  TaskPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: !Sub "${ServiceName}-task-policy"
+      Roles:
+        - !Ref TaskRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "secretsmanager:GetRandomPassword"
+              - "secretsmanager:GetResourcePolicy"
+              - "secretsmanager:GetSecretValue"
+              - "secretsmanager:DescribeSecret"
+              - "secretsmanager:ListSecretVersionIds"
+            Resource: !Ref JwksSecretsManager
