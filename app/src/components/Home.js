@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { web3 } from '@project-serum/anchor';
 import fetch from 'node-fetch';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
@@ -39,18 +38,15 @@ const Home = () => {
         // get the access token and have the user sign it
         const body = await response.json();
         const accessToken = body.access_token;
-        const signedMessage = await wallet.signMessage(encoder.encode(accessToken));
-        console.log(signedMessage.length);
+
+        const accessTokenU8IntArray = encoder.encode(accessToken);
+        const signedMessage = await wallet.signMessage(accessTokenU8IntArray);
+
         const signedtoken = bs58.encode(signedMessage);
         setToken(signedtoken);
         setJwt(accessToken);
 
-        console.log(wallet.publicKey.toBase58());
-        console.log(wallet.publicKey.toString());
-        console.log(wallet.publicKey.toBuffer().length);
-
-        const result = nacl.sign.detached.verify(encoder.encode(accessToken), signedMessage, wallet.publicKey.toBytes());
-        console.log(result);
+        // const result = nacl.sign.detached.verify(encoder.encode(accessToken), signedMessage, wallet.publicKey.toBytes());
     };
 
     if (wallet.connecting) {
@@ -87,10 +83,14 @@ const Home = () => {
         return (
             <Row>
                 <Col>
-                    {`Token: ${token}`}
+                    <p>
+                        {`Token: ${token}`}
+                    </p>
                 </Col>
                 <Col>
-                    {`JWT: ${jwt}`}
+                    <p>
+                        {`JWT: ${jwt}`}
+                    </p>
                 </Col>
             </Row>
         );

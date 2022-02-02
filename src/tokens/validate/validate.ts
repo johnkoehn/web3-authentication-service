@@ -59,7 +59,12 @@ const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseOb
     }
 
     // validate the signed token
-    const isValid = nacl.sign.detached.verify(encoder.encode(baseToken), Uint8Array.from(bs58.decode(signedToken)), Uint8Array.from(bs58.decode(publicKey)));
+    let isValid;
+    try {
+        isValid = nacl.sign.detached.verify(encoder.encode(baseToken), Uint8Array.from(bs58.decode(signedToken)), Uint8Array.from(bs58.decode(publicKey)));
+    } catch (err) {
+        isValid = false;
+    }
 
     return h
         .response({ isValid })
