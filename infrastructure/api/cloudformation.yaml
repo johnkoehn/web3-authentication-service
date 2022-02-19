@@ -7,6 +7,15 @@ Parameters:
   DeveloperAccount:
     Type: String
     Description: The developer account
+  DomainName:
+    Type: String
+    Description: The domain name of the service
+  HostedZoneId:
+    Type: String
+    Description: The hosted zone id for route 53
+  CloudfrontCertificateArn:
+    Type: String
+    Description: The certificate arn to use for the auth cloudfront distribution
 Resources:
   KMS:
     Type: AWS::KMS::Key
@@ -71,3 +80,99 @@ Resources:
               - "secretsmanager:DescribeSecret"
               - "secretsmanager:ListSecretVersionIds"
             Resource: !Ref JwksSecretsManager
+  ### JWKS Management ###
+  JWKSBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "${ServiceName}-bucket"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - "*"
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref JWKSBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              - !Sub ${JWKSBucket.Arn}/*
+              - !GetAtt JWKSBucket.Arn
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${OriginAccessId}"
+          - Action: ["s3:*"]
+            Effect: Allow
+            Resource:
+              - !GetAtt JWKSBucket.Arn
+              - !Sub "${JWKSBucket.Arn}/*"
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}"
+  OriginAccessId:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Only allow the CloudFront Distribution to serve content from the bucket
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        # Aliases:
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName: "run.mocky.io"
+            Id: "mocky-testing"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: "https-only"
+              OriginKeepaliveTimeout: 60
+              OriginReadTimeout: 60
+              OriginSSLProtocols:
+                - "TLSv1.2"
+          - DomainName: !GetAtt JWKSBucket.DomainName
+            Id: !Ref JWKSBucket
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${OriginAccessId}
+        DefaultCacheBehavior:
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          Compress: false
+          CachedMethods:
+            - GET
+            - HEAD
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - PATCH
+            - POST
+            - DELETE
+          ViewerProtocolPolicy: https-only
+          TargetOriginId: "mocky-testing"
+        CacheBehaviors:
+          - CachePolicyId: b2884449-e4de-46a7-ac36-70bc7f1ddd6d
+            TargetOriginId: !Ref JWKSBucket
+            ViewerProtocolPolicy: https-only
+            PathPattern: "/.well-known/jwks.json"
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudfrontCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name:  !Ref DomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2 # The Hosted Zone ID of all cloudfront distributions
+        DNSName: !GetAtt "CloudFrontDistribution.DomainName"

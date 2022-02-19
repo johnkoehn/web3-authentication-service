@@ -42,7 +42,7 @@ SERVICE_NAME=web3-authentication-service
 # echo "Copying contents of .env.local into .env now that the build completed"
 # cp "./infrastructure/api/.env.local" .env
 
-echo "Updating infrastructure and updating the server"
+echo "Updating infrastructure and server"
 aws cloudformation deploy \
     --stack-name=${SERVICE_NAME} \
     --template-file=./infrastructure/api/cloudformation.yaml \

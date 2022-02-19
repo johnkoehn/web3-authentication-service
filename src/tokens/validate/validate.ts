@@ -1,28 +1,12 @@
 import { Request, ResponseObject, ResponseToolkit } from '@hapi/hapi';
-import jose from 'node-jose';
 import Boom from '@hapi/boom';
 import nacl from 'tweetnacl';
-import { verify, JwtHeader, JwtPayload } from 'jsonwebtoken';
+import { verify, JwtPayload } from 'jsonwebtoken';
 import { TextEncoder, promisify } from 'util';
 import bs58 from 'bs58';
-import getKeys from '../../util/keys/getKeys';
+import getSigningKey from './getSigningKey';
 
 const encoder = new TextEncoder();
-
-const getSigningKey = async (header: JwtHeader, callback: Function): Promise<void> => {
-    const jwks: PublicJwks = await getKeys(false, true);
-    const keyStore = await jose.JWK.asKeyStore(jwks);
-
-    const key = (keyStore.all({ use: 'sig' }).find((x) => x.kid === header.kid) as unknown as jose.JWK.Key);
-
-    if (!key) {
-        const error = new Error('Failed to find kid');
-        callback(error, null);
-        return;
-    }
-
-    callback(null, key.toPEM(false));
-};
 
 let jwtVerifyPromise: JwtVerifyPromise;
 const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseObject> => {
