@@ -13,9 +13,6 @@ Parameters:
   HostedZoneId:
     Type: String
     Description: The hosted zone id for route 53
-  CloudfrontCertificateArn:
-    Type: String
-    Description: The certificate arn to use for the auth cloudfront distribution
 Resources:
   KMS:
     Type: AWS::KMS::Key
@@ -124,7 +121,8 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        # Aliases:
+        Aliases:
+          - !Ref DomainName
         Enabled: true
         HttpVersion: http2
         Origins:
@@ -164,9 +162,18 @@ Resources:
             ViewerProtocolPolicy: https-only
             PathPattern: "/.well-known/jwks.json"
         ViewerCertificate:
-          AcmCertificateArn: !Ref CloudfrontCertificateArn
+          AcmCertificateArn: !Ref Certificate
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      CertificateTransparencyLoggingPreference: ENABLED # Interesting article https://aws.amazon.com/blogs/security/how-to-get-ready-for-certificate-transparency/
+      DomainName: !Ref DomainName
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+      ValidationMethod: DNS
   DNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
