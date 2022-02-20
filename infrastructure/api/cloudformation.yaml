@@ -22,6 +22,21 @@ Parameters:
   DockerImage:
     Type: String
     Description: Docker image the task should use
+  PrivateSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets to run the task in
+  PublicSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Public subnets to run the loadbalancer in
+  VpcId:
+    Type: String
+    Description: The VPC we are running the service in
+  ApiDomainName:
+    Type: String
+    Description: The actual domain name to put the API behind
+  ApiHostedZoneId:
+    Type: String
+    Description: The hosted zone id for the API domain name
 Resources:
   KMS:
     Type: AWS::KMS::Key
@@ -69,6 +84,8 @@ Resources:
                 - !Sub arn:aws:iam::${AWS::AccountId}:user/${DeveloperAccount}
             Action:
               - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
   TaskPolicy:
     Type: "AWS::IAM::Policy"
     Properties:
@@ -86,6 +103,10 @@ Resources:
               - "secretsmanager:DescribeSecret"
               - "secretsmanager:ListSecretVersionIds"
             Resource: !Ref JwksSecretsManager
+          - Effect: "Allow"
+            Action:
+              - "logs:*"
+            Resource: !GetAtt LogGroup.Arn
   ### JWKS Management ###
   JWKSBucket:
     Type: "AWS::S3::Bucket"
@@ -177,7 +198,7 @@ Resources:
   Certificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
-      CertificateTransparencyLoggingPreference: ENABLED # Interesting article https://aws.amazon.com/blogs/security/how-to-get-ready-for-certificate-transparency/
+      CertificateTransparencyLoggingPreference: ENABLED
       DomainName: !Ref DomainName
       DomainValidationOptions:
         - DomainName: !Ref DomainName
@@ -251,3 +272,168 @@ Resources:
           Environment:
             - Name: JWKS_SECRETS_MANAGER
               Value: !Ref JwksSecretsManager
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - LoadBalancer
+      - LoadBalancerListener
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      LaunchType: FARGATE
+      PropagateTags: TASK_DEFINITION
+      LoadBalancers:
+        - ContainerName: !Ref EcsCluster
+          ContainerPort: 8000
+          TargetGroupArn: !Ref TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref PrivateSubnets
+          SecurityGroups:
+            - !Ref AppSg
+      PropagateTags: TASK_DEFINITION
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100 # Keep previous version running while doing a deployment until the new tasks become healthy
+        MaximumPercent: 200 # Never run more than double the desited count
+      ServiceName: !Ref ServiceName
+      TaskDefinition: !Ref TaskDefinition
+  LoadBalancerSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ServiceName} Security Group"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+  AppSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows Fargate tasks to communicate with the load balancer on all ports
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          SourceSecurityGroupId: !Ref LoadBalancerSg
+          FromPort: 1
+          ToPort: 65000
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds # Wait 1 minute for a resoponse from the task before timing out
+        Value: '60'
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSg
+      Subnets:
+        !Ref PublicSubnets
+      Type: application
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref ApiCertificate
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /health
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Port: 8000
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+      TargetType: ip
+      VpcId: !Ref VpcId
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      CertificateTransparencyLoggingPreference: ENABLED
+      DomainName: !Ref ApiDomainName
+      DomainValidationOptions:
+        - DomainName: !Ref ApiDomainName
+          HostedZoneId: !Ref ApiHostedZoneId
+      ValidationMethod: DNS
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref ApiHostedZoneId
+      Name:  !Ref ApiDomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt LoadBalancer.DNSName
+  # AlertTopic:
+  #   Type: AWS::SNS::Topic
+  #   Properties:
+  #     Subscription:
+  #     - Endpoint: !Ref NotificationEmail
+  #       Protocol: email
+  # AlertMetricFilter:
+  #   Type: AWS::Logs::MetricFilter
+  #   Properties:
+  #     FilterPattern: '"ALERT:"'
+  #     LogGroupName: !Ref LogGroup
+  #     MetricTransformations:
+  #       - MetricName: alerts
+  #         MetricNamespace: !Ref ServiceName
+  #         MetricValue: '1'
+  # AlertMetricAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   Properties:
+  #       AlarmName: !Sub "${ServiceName}-Alert-Metric-Alarm"
+  #       AlarmDescription: "Send an email when an alert is logged"
+  #       AlarmActions:
+  #         - !Ref AlertTopic
+  #       MetricName: alerts
+  #       Namespace: !Ref ServiceName
+  #       ComparisonOperator: "GreaterThanOrEqualToThreshold"
+  #       EvaluationPeriods: 1
+  #       Period: 300
+  #       Statistic: "Sum"
+  #       Threshold: 1
+  # AutoScalingTarget:
+  #   Type: AWS::ApplicationAutoScaling::ScalableTarget
+  #   Properties:
+  #     MinCapacity: !Ref DesiredInstanceCount
+  #     MaxCapacity: !Ref MaxInstanceCount
+  #     ResourceId: !Join ['/', [service, !Ref ECSCluster, !GetAtt ECSService.Name]]
+  #     ScalableDimension: ecs:service:DesiredCount
+  #     ServiceNamespace: ecs
+  #     RoleARN: !GetAtt AutoScalingRole.Arn
+  # AutoScalingRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     RoleName: !Sub "${ServiceName}-auto-scaling-role"
+  #     AssumeRolePolicyDocument:
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service: ecs-tasks.amazonaws.com
+  #           Action: sts:AssumeRole
+  #     ManagedPolicyArns:
+  #       - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+  # AutoScalingPolicy:
+  #   Type: AWS::ApplicationAutoScaling::ScalingPolicy
+  #   Properties:
+  #     PolicyName: !Sub "${ServiceName}-auto-scaling-policy"
+  #     PolicyType: TargetTrackingScaling
+  #     ScalingTargetId: !Ref AutoScalingTarget
+  #     TargetTrackingScalingPolicyConfiguration:
+  #       PredefinedMetricSpecification:
+  #         PredefinedMetricType: ECSServiceAverageCPUUtilization
+  #       ScaleInCooldown: 300
+  #       ScaleOutCooldown: 300
+  #       TargetValue: !Ref AutoScalingCpuTargetValue

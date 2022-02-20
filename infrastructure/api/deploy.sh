@@ -22,25 +22,25 @@ echo -e "\n$HORIZONTAL_LINE"
 
 SERVICE_NAME=web3-authentication-service
 
-# echo "Connecting to docker registry"
+echo "Connecting to ECR"
 GIT_COMMIT="$(git rev-parse HEAD)"
 DOCKER_IMAGE_TAG="web3-authentication-service:${GIT_COMMIT}"
 ECR_URL="$(aws ecr describe-repositories --repository-names ${SERVICE_NAME} --query 'repositories[*].repositoryUri' --output text)"
-# aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR_URL}
+aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR_URL}
 
-# echo "Copying contents of .env.${ENVIRONMENT} into .env to build the docker correctly"
-# cp "./infrastructure/api/.env.${ENVIRONMENT}" .env
+echo "Copying contents of .env.${ENVIRONMENT} into .env to build the docker correctly"
+cp "./infrastructure/api/.env.${ENVIRONMENT}" .env
 
-# echo "Building the docker image"
-# docker build . -t ${DOCKER_IMAGE_TAG}
+echo "Building the docker image"
+docker buildx build . -t ${DOCKER_IMAGE_TAG} --platform linux/amd64
 
-# echo "Pushing the docker image to ECS"
+echo "Pushing the docker image to ECR"
 AWS_DOCKER_IMAGE="${ECR_URL}:${GIT_COMMIT}"
-# docker tag ${DOCKER_IMAGE_TAG} ${AWS_DOCKER_IMAGE}
-# docker push ${AWS_DOCKER_IMAGE}
+docker tag ${DOCKER_IMAGE_TAG} ${AWS_DOCKER_IMAGE}
+docker push ${AWS_DOCKER_IMAGE}
 
-# echo "Copying contents of .env.local into .env now that the build completed"
-# cp "./infrastructure/api/.env.local" .env
+echo "Copying contents of .env.local into .env now that the build completed"
+cp "./infrastructure/api/.env.local" .env
 
 echo "Updating infrastructure and server"
 aws cloudformation deploy \
