@@ -13,6 +13,15 @@ Parameters:
   HostedZoneId:
     Type: String
     Description: The hosted zone id for route 53
+  Memory:
+    Type: String
+    Description: Amount of memory to give the API tasks
+  Cpu:
+    Type: String
+    Description: Amount of CPU to give the API tasks
+  DockerImage:
+    Type: String
+    Description: Docker image the task should use
 Resources:
   KMS:
     Type: AWS::KMS::Key
@@ -183,3 +192,62 @@ Resources:
       AliasTarget:
         HostedZoneId: Z2FDTNDATAQYW2 # The Hosted Zone ID of all cloudfront distributions
         DNSName: !GetAtt "CloudFrontDistribution.DomainName"
+
+  ### API Setup ##
+  DockerRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ServiceName
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: '{
+          "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Lifecycle policy for cleaning up old docker image",
+                "selection": {
+                    "tagStatus": "any",
+                    "countType": "imageCountMoreThan",
+                    "countNumber": 2
+                },
+                "action": {
+                    "type": "expire"
+                }
+              }
+          ]
+        }'
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Ref ServiceName
+      RetentionInDays: 30
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ServiceName
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      ExecutionRoleArn: !GetAtt TaskRole.Arn
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Essential: true
+          Image: !Ref DockerImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: !Ref ServiceName
+          Name: !Ref EcsCluster
+          PortMappings:
+            - ContainerPort: 8000
+          StopTimeout: 120
+          Environment:
+            - Name: JWKS_SECRETS_MANAGER
+              Value: !Ref JwksSecretsManager

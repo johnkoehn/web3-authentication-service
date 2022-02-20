@@ -23,9 +23,9 @@ echo -e "\n$HORIZONTAL_LINE"
 SERVICE_NAME=web3-authentication-service
 
 # echo "Connecting to docker registry"
-# UNIQUE_HASH="$(openssl rand -hex 8)"
-# DOCKER_IMAGE_TAG="web3-authentication-service:${UNIQUE_HASH}"
-# ECR_URL="$(aws ecr describe-repositories --repository-names ${SERVICE_NAME}-repo --query 'repositories[*].repositoryUri' --output text)"
+GIT_COMMIT="$(git rev-parse HEAD)"
+DOCKER_IMAGE_TAG="web3-authentication-service:${GIT_COMMIT}"
+ECR_URL="$(aws ecr describe-repositories --repository-names ${SERVICE_NAME} --query 'repositories[*].repositoryUri' --output text)"
 # aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR_URL}
 
 # echo "Copying contents of .env.${ENVIRONMENT} into .env to build the docker correctly"
@@ -35,7 +35,7 @@ SERVICE_NAME=web3-authentication-service
 # docker build . -t ${DOCKER_IMAGE_TAG}
 
 # echo "Pushing the docker image to ECS"
-# AWS_DOCKER_IMAGE="${ECR_URL}:${UNIQUE_HASH}"
+AWS_DOCKER_IMAGE="${ECR_URL}:${GIT_COMMIT}"
 # docker tag ${DOCKER_IMAGE_TAG} ${AWS_DOCKER_IMAGE}
 # docker push ${AWS_DOCKER_IMAGE}
 
