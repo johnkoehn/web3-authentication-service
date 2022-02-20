@@ -37,6 +37,18 @@ Parameters:
   ApiHostedZoneId:
     Type: String
     Description: The hosted zone id for the API domain name
+  AutoScalingCpuTargetValue:
+    Type: String
+    Description: The target CPU value to start auto scaling at
+  MaxInstanceCount:
+    Type: String
+    Description: The max number of instances to run
+  DesiredInstanceCount:
+    Type: String
+    Description: The desired 'default' state
+  NotificationEmail:
+    Type: String
+    Description: The email address to send notifications to
 Resources:
   KMS:
     Type: AWS::KMS::Key
@@ -156,8 +168,8 @@ Resources:
         Enabled: true
         HttpVersion: http2
         Origins:
-          - DomainName: "run.mocky.io"
-            Id: "mocky-testing"
+          - DomainName: !Ref ApiDomainName
+            Id: "auth-api"
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
@@ -185,7 +197,7 @@ Resources:
             - POST
             - DELETE
           ViewerProtocolPolicy: https-only
-          TargetOriginId: "mocky-testing"
+          TargetOriginId: "auth-api"
         CacheBehaviors:
           - CachePolicyId: b2884449-e4de-46a7-ac36-70bc7f1ddd6d
             TargetOriginId: !Ref JWKSBucket
@@ -375,65 +387,65 @@ Resources:
       AliasTarget:
         HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
         DNSName: !GetAtt LoadBalancer.DNSName
-  # AlertTopic:
-  #   Type: AWS::SNS::Topic
-  #   Properties:
-  #     Subscription:
-  #     - Endpoint: !Ref NotificationEmail
-  #       Protocol: email
-  # AlertMetricFilter:
-  #   Type: AWS::Logs::MetricFilter
-  #   Properties:
-  #     FilterPattern: '"ALERT:"'
-  #     LogGroupName: !Ref LogGroup
-  #     MetricTransformations:
-  #       - MetricName: alerts
-  #         MetricNamespace: !Ref ServiceName
-  #         MetricValue: '1'
-  # AlertMetricAlarm:
-  #   Type: AWS::CloudWatch::Alarm
-  #   Properties:
-  #       AlarmName: !Sub "${ServiceName}-Alert-Metric-Alarm"
-  #       AlarmDescription: "Send an email when an alert is logged"
-  #       AlarmActions:
-  #         - !Ref AlertTopic
-  #       MetricName: alerts
-  #       Namespace: !Ref ServiceName
-  #       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-  #       EvaluationPeriods: 1
-  #       Period: 300
-  #       Statistic: "Sum"
-  #       Threshold: 1
-  # AutoScalingTarget:
-  #   Type: AWS::ApplicationAutoScaling::ScalableTarget
-  #   Properties:
-  #     MinCapacity: !Ref DesiredInstanceCount
-  #     MaxCapacity: !Ref MaxInstanceCount
-  #     ResourceId: !Join ['/', [service, !Ref ECSCluster, !GetAtt ECSService.Name]]
-  #     ScalableDimension: ecs:service:DesiredCount
-  #     ServiceNamespace: ecs
-  #     RoleARN: !GetAtt AutoScalingRole.Arn
-  # AutoScalingRole:
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     RoleName: !Sub "${ServiceName}-auto-scaling-role"
-  #     AssumeRolePolicyDocument:
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service: ecs-tasks.amazonaws.com
-  #           Action: sts:AssumeRole
-  #     ManagedPolicyArns:
-  #       - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
-  # AutoScalingPolicy:
-  #   Type: AWS::ApplicationAutoScaling::ScalingPolicy
-  #   Properties:
-  #     PolicyName: !Sub "${ServiceName}-auto-scaling-policy"
-  #     PolicyType: TargetTrackingScaling
-  #     ScalingTargetId: !Ref AutoScalingTarget
-  #     TargetTrackingScalingPolicyConfiguration:
-  #       PredefinedMetricSpecification:
-  #         PredefinedMetricType: ECSServiceAverageCPUUtilization
-  #       ScaleInCooldown: 300
-  #       ScaleOutCooldown: 300
-  #       TargetValue: !Ref AutoScalingCpuTargetValue
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+      - Endpoint: !Ref NotificationEmail
+        Protocol: email
+  AlertMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterPattern: '"ALERT:"'
+      LogGroupName: !Ref LogGroup
+      MetricTransformations:
+        - MetricName: alerts
+          MetricNamespace: !Ref ServiceName
+          MetricValue: '1'
+  AlertMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+        AlarmName: !Sub "${ServiceName}-Alerts"
+        AlarmDescription: "Send an email when an alert is logged"
+        AlarmActions:
+          - !Ref AlertTopic
+        MetricName: alerts
+        Namespace: !Ref ServiceName
+        ComparisonOperator: "GreaterThanOrEqualToThreshold"
+        EvaluationPeriods: 1
+        Period: 300
+        Statistic: "Sum"
+        Threshold: 1
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref DesiredInstanceCount
+      MaxCapacity: !Ref MaxInstanceCount
+      ResourceId: !Join ['/', [service, !Ref EcsCluster, !GetAtt ECSService.Name]]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN: !GetAtt AutoScalingRole.Arn
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ServiceName}-auto-scaling-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${ServiceName}-auto-scaling-policy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 300
+        TargetValue: !Ref AutoScalingCpuTargetValue

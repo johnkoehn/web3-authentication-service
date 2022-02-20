@@ -43,6 +43,18 @@ const init = async () => {
     server.route(health);
     server.route(catchAll);
 
+    server.ext({
+        type: 'onPreResponse',
+        method: (request, h) => {
+            const response = request.response as any;
+            if (response.isBoom && response.isServer) {
+                console.log(`ALERT: Server Error: ${response.stack}`);
+            }
+
+            return h.continue;
+        }
+    });
+
     await server.start();
 
     process.on('SIGTERM', async () => {
