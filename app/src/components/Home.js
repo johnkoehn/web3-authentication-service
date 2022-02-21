@@ -19,34 +19,58 @@ const Home = () => {
     const fetchAndAssignToken = async () => {
         setError(undefined);
 
-        const response = await fetch('http://localhost:8000/tokens', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json'
-            },
-            body: JSON.stringify({
-                publicKey: wallet.publicKey.toString()
-            })
-        });
+        try {
+            const response = await fetch(`${process.env.REACT_APP_AUTH_URL}/tokens`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({
+                    publicKey: wallet.publicKey.toString()
+                })
+            });
 
-        if (!response.ok) {
-            setError('Failed to get token');
-            return;
+            if (!response.ok) {
+                setError('Failed to get token');
+                return;
+            }
+
+            // get the access token and have the user sign it
+            const body = await response.json();
+            const accessToken = body.access_token;
+
+            const accessTokenU8IntArray = encoder.encode(accessToken);
+            const signedMessage = await wallet.signMessage(accessTokenU8IntArray);
+
+            const signedtoken = bs58.encode(signedMessage);
+            setToken(signedtoken);
+            setJwt(accessToken);
+        } catch (err) {
+            setError(err.message);
         }
 
-        // get the access token and have the user sign it
-        const body = await response.json();
-        const accessToken = body.access_token;
-
-        const accessTokenU8IntArray = encoder.encode(accessToken);
-        const signedMessage = await wallet.signMessage(accessTokenU8IntArray);
-
-        const signedtoken = bs58.encode(signedMessage);
-        setToken(signedtoken);
-        setJwt(accessToken);
-
         // const result = nacl.sign.detached.verify(encoder.encode(accessToken), signedMessage, wallet.publicKey.toBytes());
+    };
+
+    const fetchJwks = async () => {
+        setError(undefined);
+
+        try {
+            const response = await fetch(`${process.env.REACT_APP_AUTH_URL}/.well-known/jwks.json`, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                    Origin: 'http://localhost:3000'
+                }
+            });
+
+            const responseBody = await response.json();
+            console.log(responseBody);
+        } catch (err) {
+            console.log(err);
+            setError(err.message);
+        }
     };
 
     if (wallet.connecting) {
@@ -107,6 +131,13 @@ const Home = () => {
                 <Col>
                     <LoadingButton onClick={fetchAndAssignToken}>
                         Get Signed Token
+                    </LoadingButton>
+                </Col>
+            </Row>
+            <Row>
+                <Col>
+                    <LoadingButton onClick={fetchJwks}>
+                        Get JWKS
                     </LoadingButton>
                 </Col>
             </Row>

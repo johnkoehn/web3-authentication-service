@@ -6,7 +6,6 @@ import health from './health';
 import catchAll from './catchAll';
 import assumeTaskRole from './util/aws/assumeTaskRole';
 import createToken from './tokens/createToken';
-import getJwks from './tokens/getJwks';
 import getKeys from './util/keys/getKeys';
 import validate from './tokens/validate/validate';
 
@@ -40,10 +39,21 @@ const init = async () => {
     server.validator(joi);
 
     server.route(createToken);
-    server.route(getJwks);
     server.route(validate);
     server.route(health);
     server.route(catchAll);
+
+    server.ext({
+        type: 'onPreResponse',
+        method: (request, h) => {
+            const response = request.response as any;
+            if (response.isBoom && response.isServer) {
+                console.log(`ALERT: Server Error: ${response.stack}`);
+            }
+
+            return h.continue;
+        }
+    });
 
     await server.start();
 
