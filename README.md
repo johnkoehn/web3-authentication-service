@@ -30,4 +30,4 @@ Now that the app has a signed JWT, it will call the posts API to get the list of
 
 In the API, first we validate the JWT by reading the value of Base-Token. We verify the JWT has not expired, that it has the correct issuer and that the signature is valid by using the JWKS. Next we take the signed token in the Authorization header, the public key from the decoded JWT (sub field) and the JWT itself and verify the signature of the signed token. If the verification checks out, the authorization check passes!
 
-<img  src="./images/Basics.png">
+<img  src="./images/Design-1.png">
