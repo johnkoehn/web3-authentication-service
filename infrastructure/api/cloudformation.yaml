@@ -183,7 +183,9 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${OriginAccessId}
         DefaultCacheBehavior:
-          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # No caching
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3 # Forward all headers
+          ResponseHeadersPolicyId: 5cc3b908-e619-4b99-88e5-2cf7f45965bd # Allow CORS requests
           Compress: false
           CachedMethods:
             - GET
@@ -199,7 +201,8 @@ Resources:
           ViewerProtocolPolicy: https-only
           TargetOriginId: "auth-api"
         CacheBehaviors:
-          - CachePolicyId: b2884449-e4de-46a7-ac36-70bc7f1ddd6d
+          - CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed Caching Optimized
+            OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf # S3 Forward CORS headers
             TargetOriginId: !Ref JWKSBucket
             ViewerProtocolPolicy: https-only
             PathPattern: "/.well-known/jwks.json"

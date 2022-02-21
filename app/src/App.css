@@ -1,3 +1,7 @@
 .navbar-brand {
     color: #e9ecef !important
 }
+
+button {
+    margin-top: 5px;
+}
