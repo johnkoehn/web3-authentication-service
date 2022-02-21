@@ -8,12 +8,22 @@ import getSigningKey from './getSigningKey';
 
 const encoder = new TextEncoder();
 
-let jwtVerifyPromise: JwtVerifyPromise;
-const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseObject> => {
-    if (!jwtVerifyPromise) {
-        jwtVerifyPromise = promisify(verify);
-    }
+const jwtVerifyPromise: JwtVerifyPromise = promisify(verify);
 
+const validateJwt = async (baseToken: string): Promise<JwtPayload> => {
+    try {
+        const jwtPayload: JwtPayload = await jwtVerifyPromise(baseToken, getSigningKey, {
+            algorithms: ['RS256'],
+            issuer: process.env.ISSUER
+        });
+
+        return jwtPayload;
+    } catch (err: any) {
+        throw Boom.unauthorized(err.message);
+    }
+};
+
+const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseObject> => {
     const authorizationHeader = request.headers.authorization;
 
     if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
@@ -22,36 +32,25 @@ const handler = async (request: Request, h: ResponseToolkit): Promise<ResponseOb
 
     const signedToken: string = authorizationHeader.split('Bearer ')[1];
     const baseToken: string = request.headers['base-token'];
-    const publicKey: string = request.headers['public-key'];
 
     if (!baseToken) {
         throw Boom.badRequest('Pass the JWT in the Base-Token header');
     }
 
-    if (!publicKey) {
-        throw Boom.badRequest('Pass the public key in the Public-Key header');
-    }
-
     // validate the JWT
-    try {
-        const jwtPayload: JwtPayload = await jwtVerifyPromise(baseToken, getSigningKey, {
-            algorithms: ['RS256'],
-            issuer: process.env.ISSUER
-        });
-
-        if (jwtPayload.sub !== publicKey) {
-            throw new Error('Subject does not matched the public key');
-        }
-    } catch (err: any) {
-        throw Boom.badRequest(err.message);
-    }
+    const jwtPayload: JwtPayload = await validateJwt(baseToken);
+    const publicKey = jwtPayload.sub as string;
 
     // validate the signed token
     let isValid;
     try {
         isValid = nacl.sign.detached.verify(encoder.encode(baseToken), Uint8Array.from(bs58.decode(signedToken)), Uint8Array.from(bs58.decode(publicKey)));
-    } catch (err) {
-        isValid = false;
+    } catch (err: any) {
+        throw Boom.unauthorized(err.message);
+    }
+
+    if (!isValid) {
+        throw Boom.unauthorized();
     }
 
     return h
