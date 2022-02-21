@@ -10,11 +10,11 @@ In web3, we have two types of applications.
 | Users are in full control | Slow to finalize an action|
 | Immune to censorship | |
 
-Pure web3 apps are truly awesome, however building a game that purely runs on a blockchain or social media app is not feasible. This is where a "semi" web3 app comes in. This is a blend of using traditional backend technologies with blockchain.
+Pure web3 apps are truly awesome, however building a game that runs purely on a blockchain or social media app is not always feasible. This is where a "semi" web3 app comes in. This is a blend of using traditional backend technologies with blockchain.
 
 *Semi Web3 Apps* - In a "semi" web3 app, we utilize traditional backend technologies with blockchains. Let's take a card trading game for example. When two players are playing each other online, a server would manage the game state. However, the cards that the player owned would live on the blockchain and be associated with each player's public key.
 
-Now, what often annoys me in the case of semi web 3 apps, is sometimes I still have to create an account with an email/password. This is a big no no in my eyes. My identity is my private/public keypair and we should be able to do authorization and authentication using that. The goal  of this repo is to show a way of doing authorization and authentication using a crypto wallet.
+Now, what often annoys me in the case of semi web 3 apps, is sometimes I still have to create an account with an email and password. This is a big no no in my eyes. My identity is my private/public keypair and we should be able to do authorization and authentication using that. The goal  of this repo is to show a way of doing authorization and authentication using a crypto wallet.
 
 ### Design
 
