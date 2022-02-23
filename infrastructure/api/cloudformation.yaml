@@ -49,6 +49,12 @@ Parameters:
   NotificationEmail:
     Type: String
     Description: The email address to send notifications to
+  RotationLambdaArn:
+    Type: String
+    Description: The lambda arn for rotating the JWKS
+  LambdaRotationRoleArn:
+    Type: String
+    Description: The rotation role arn
 Resources:
   KMS:
     Type: AWS::KMS::Key
@@ -74,12 +80,27 @@ Resources:
               - kms:GenerateDataKey
               - kms:Decrypt
             Resource: "*"
+          - Sid: Rotation Lambda Access
+            Effect: Allow
+            Principal:
+              AWS: !Ref LambdaRotationRoleArn
+            Action:
+              - kms:GenerateDataKey
+              - kms:Decrypt
+            Resource: "*"
   JwksSecretsManager:
     Type: AWS::SecretsManager::Secret
     Properties:
       Description: !Sub ${ServiceName} JWKS Secrets Manager
       KmsKeyId: !Ref KMS
       Name: !Sub ${ServiceName}-jwks-secrets-manager
+  JwksRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    Properties:
+      SecretId: !Ref JwksSecretsManager
+      RotationLambdaARN: !Ref RotationLambdaArn
+      RotationRules:
+        AutomaticallyAfterDays: 15
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
