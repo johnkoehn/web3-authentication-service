@@ -21,10 +21,11 @@ const createJwt = async (publicKey: string): Promise<TokenResponse> => {
 
     // luxon returing to seconds with seconds being decimals??? https://github.com/moment/luxon/issues/565
     const now = DateTime.now().toUTC();
+    const iat = Math.floor(now.toSeconds());
     const body = {
         sub: publicKey,
-        exp: ((now.toSeconds() * 1000) + TWELEVE_HOURS),
-        iat: (now.toSeconds() * 1000),
+        exp: iat + TWELEVE_HOURS,
+        iat,
         iss: process.env.ISSUER
     };
     const payload = JSON.stringify(body);

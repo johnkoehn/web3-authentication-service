@@ -20,9 +20,9 @@ jest.mock('node-jose', () => {
 
 jest.mock('../util/keys/getKeys', () => jest.fn());
 
-const MOCKED_TIME = 1643562274;
+const MOCKED_TIME_IN_SECONDS = 1643562;
 const TWELEVE_HOURS = 43200;
-mockDate.set(MOCKED_TIME);
+mockDate.set(MOCKED_TIME_IN_SECONDS * 1000);
 
 describe('Create JWT', () => {
     let keySet: Jwks;
@@ -84,8 +84,8 @@ describe('Create JWT', () => {
     it('should create the signed JWT with the first JWK in the set', async () => {
         const expectedPayload = JSON.stringify({
             sub: publicKey,
-            exp: MOCKED_TIME + TWELEVE_HOURS,
-            iat: MOCKED_TIME,
+            exp: MOCKED_TIME_IN_SECONDS + TWELEVE_HOURS,
+            iat: MOCKED_TIME_IN_SECONDS,
             iss: process.env.ISSUER
         });
 
